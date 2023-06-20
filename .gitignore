@@ -3,3 +3,4 @@
 *.o
 *.a
 test
+/vtparse_table.[ch]
