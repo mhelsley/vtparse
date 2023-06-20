@@ -28,20 +28,20 @@ impl CParser {
     }
 }
 
-pub struct Parser<'a> {
+pub struct Parser {
     inner: CParser,
-    callback: Box<dyn FnMut(&'a mut Parser, Action, u8) + 'a>,
 }
 
 use container_of::container_of;
 
-impl<'a> Parser<'a> {
+impl Parser {
     // Wrap the Rust-friendly callbacks
     extern "C" fn wrapper(cparser: *mut CParser, action: vtparse_c::vtparse_action_t, c: u8) {
         if let Err(err) = std::panic::catch_unwind(|| {
             let parser = unsafe { &mut *container_of!(cparser, Parser, inner) };
-            let callback = &mut parser.callback;
-            (callback)(parser, Action::from(action), c);
+            let cb_ptr = (*cparser).user_data as *mut c_void;
+            let cb = cb_ptr as *mut dyn FnMut(&mut Parser, Action, u8);
+            (*cb)(parser, action, c);
         }) {
             // Code here must be panic-free.
             #[cfg(not(feature = "unwind"))]
@@ -62,7 +62,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn new(cb: impl FnMut(&'a mut Parser, Action, u8) + 'a) -> Self {
+    pub fn new(cb: &mut dyn FnMut(&mut Parser, Action, u8)) -> Self {
         let mut cparser = std::mem::MaybeUninit::<CParser>::zeroed();
         unsafe {
             vtparse_c::vtparse_init(cparser.as_mut_ptr(), Some(Self::wrapper));
@@ -70,9 +70,8 @@ impl<'a> Parser<'a> {
         let cparser = unsafe { cparser.assume_init() };
         let mut s = Self {
             inner: cparser,
-            callback: Box::new(cb),
         };
-        s.inner.user_data = &mut cb as *mut dyn FnMut(&'a mut Parser, Action, u8) as *mut c_void;
+        s.inner.user_data = cb as *mut dyn FnMut(&mut Parser, Action, u8) as *mut c_void;
         s
     }
     pub fn parse(&mut self, data: *const str, len: usize) {
