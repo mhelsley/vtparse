@@ -7,6 +7,7 @@
  */
 
 #include "vtparse.h"
+#include "vtparse_table.h"
 
 void vtparse_init(vtparse_t *parser, vtparse_callback_t cb)
 {
@@ -125,7 +126,7 @@ static void do_state_change(vtparse_t *parser, state_change_t change, char ch)
     }
 }
 
-void vtparse(vtparse_t *parser, unsigned char *data, int len)
+void vtparse(vtparse_t *parser, const unsigned char *data, int len)
 {
     int i;
     for(i = 0; i < len; i++)

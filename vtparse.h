@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-#include "vtparse_table.h"
+#include "vtparse_enums.h"
 
 #define MAX_INTERMEDIATE_CHARS 2
 #define ACTION(state_change) (state_change & 0x0F)
@@ -35,7 +35,7 @@ typedef struct vtparse {
 } vtparse_t;
 
 void vtparse_init(vtparse_t *parser, vtparse_callback_t cb);
-void vtparse(vtparse_t *parser, unsigned char *data, int len);
+void vtparse(vtparse_t *parser, const unsigned char * data, int len);
 
 #ifdef __cplusplus
 }

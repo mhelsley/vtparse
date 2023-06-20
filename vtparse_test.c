@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include "vtparse.h"
 
+#include "vtparse_names.c"
+
 void parser_callback(vtparse_t *parser, vtparse_action_t action, unsigned char ch)
 {
     int i;
