@@ -17,17 +17,8 @@ mod vtparse_c {
 
 pub type Action = vtparse_c::vtparse_action_t;
 type CParser = vtparse_c::vtparse_t;
-type CCallback = vtparse_c::vtparse_callback_t;
 
 impl CParser {
-    #[allow(unused)]
-    fn init(&mut self, cb: CCallback) {
-        unsafe {
-            vtparse_c::vtparse_init(self, cb);
-        }
-    }
-
-    #[allow(unused)]
     fn parse(&mut self, data: *const str, len: usize) {
         unsafe {
             vtparse_c::vtparse(self, data as *const u8, len as i32);
@@ -39,7 +30,6 @@ impl CParser {
 /// NOTE: Presently does not support Closures
 pub type Callback<'a> = fn(&'a mut Parser, Action, u8);
 
-#[allow(unused)]
 pub struct Parser<'a> {
     inner: CParser,
     callback: Callback<'a>,
