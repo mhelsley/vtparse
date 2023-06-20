@@ -9,6 +9,8 @@
 /// For the state machine documentation see:
 ///     https://vt100.net/emu/dec_ansi_parser
 ///
+use std::ffi::c_void;
+
 #[allow(non_camel_case_types)]
 #[allow(unused)]
 mod vtparse_c {
@@ -26,23 +28,20 @@ impl CParser {
     }
 }
 
-/// The Rust Callback type supported by this wrapper
-/// NOTE: Presently does not support Closures
-pub type Callback<'a> = fn(&'a mut Parser, Action, u8);
-
 pub struct Parser<'a> {
     inner: CParser,
-    callback: Callback<'a>,
+    callback: Box<dyn FnMut(&'a mut Parser, Action, u8) + 'a>,
 }
 
 use container_of::container_of;
 
 impl<'a> Parser<'a> {
     // Wrap the Rust-friendly callbacks
-    extern "C" fn wrapper(parser: *mut CParser, action: vtparse_c::vtparse_action_t, c: u8) {
+    extern "C" fn wrapper(cparser: *mut CParser, action: vtparse_c::vtparse_action_t, c: u8) {
         if let Err(err) = std::panic::catch_unwind(|| {
-            let parser: &mut Parser = unsafe { &mut *container_of!(parser, Parser, inner) };
-            (parser.callback)(parser, Action::from(action), c);
+            let parser = unsafe { &mut *container_of!(cparser, Parser, inner) };
+            let callback = &mut parser.callback;
+            (callback)(parser, Action::from(action), c);
         }) {
             // Code here must be panic-free.
             #[cfg(not(feature = "unwind"))]
@@ -55,7 +54,6 @@ impl<'a> Parser<'a> {
             }
             #[cfg(feature = "unwind")]
             {
-                use std::ffi::c_void;
 
                 // We can clobber parser.user_data because we're panic-ing
                 let err_ptr = std::ptr::addr_of!(err) as *mut c_void;
@@ -64,16 +62,17 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn new(cb: Callback<'a>) -> Self {
+    pub fn new(cb: impl FnMut(&'a mut Parser, Action, u8) + 'a) -> Self {
         let mut cparser = std::mem::MaybeUninit::<CParser>::zeroed();
         unsafe {
             vtparse_c::vtparse_init(cparser.as_mut_ptr(), Some(Self::wrapper));
         }
         let cparser = unsafe { cparser.assume_init() };
-        let s = Self {
+        let mut s = Self {
             inner: cparser,
-            callback: cb,
+            callback: Box::new(cb),
         };
+        s.inner.user_data = &mut cb as *mut dyn FnMut(&'a mut Parser, Action, u8) as *mut c_void;
         s
     }
     pub fn parse(&mut self, data: *const str, len: usize) {
